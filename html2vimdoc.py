@@ -8,7 +8,7 @@
 # URL: http://peterodding.com/code/vim/tools/
 #
 # Missing features:
-# TODO Support for <table> elements.
+# TODO Improved/full support for <table> elements.
 #
 # Finding the right abstractions:
 # FIXME Quirky mix of classes and functions?
@@ -902,18 +902,155 @@ class ListItem(BlockLevelNode, SequenceNode):
         # they will be chosen *after* all of the list items have been rendered.
         return [prefix] + text
 
-# TODO Parse and render tabular data.
-#@html_element('table')
-
-class Table(BlockLevelNode, SequenceNode):
+@html_element('table')
+class Table(BlockLevelSequence):
 
     """
     Block level node to represent tabular data.
     Maps to the HTML element ``<table>``.
+
+    Note: only supports trivial tables, such as those generated from markdown
+    and all rows are flattened to a single line.
+    Ultimately, the output is going to be wrong for any other type of table, or
+    there's going to be a python exception.
     """
 
     def render(self, **kw):
-        return ''
+        widths={}
+        text = []
+        for node in walk_tree(self, TableRow):
+            node.calculate_widths(widths, **kw)
+
+        for i,node in enumerate(walk_tree(self, RowSequenceNode)):
+            text += node.render(i, widths, **kw)
+
+        return text
+
+class RowSequenceNode(SequenceNode):
+
+    """
+    Base node for collections of table rows
+    """
+
+    pass
+
+@html_element('thead')
+class TableHeading(BlockLevelNode,RowSequenceNode):
+
+    """
+    Block level node to represent tabular header data.
+    Maps to the HTML element ``<thead>``.
+
+    Renders all child rows using '=' for the line separator
+    """
+
+    def render(self, section_index, widths, **kw):
+        text = []
+        for i,node in enumerate(walk_tree(self, TableRow)):
+            text += node.render(section_index + i, widths, '=', **kw)
+        return text
+
+@html_element('tbody')
+class TableBody(BlockLevelNode,RowSequenceNode):
+
+    """
+    Block level node to represent tabular header data.
+    Maps to the HTML element ``<tbody>``.
+
+    Renders all child rows using '-' for the line separator
+    """
+
+    def render(self, section_index, widths, **kw):
+        text = []
+        for i,node in enumerate(walk_tree(self, TableRow)):
+            text += node.render(section_index + i, widths, '-', **kw)
+        return text
+
+
+@html_element('tr')
+class TableRow(BlockLevelNode,SequenceNode):
+
+    """
+    Block level node to represent tabular header data.
+    Maps to the HTML element ``<tr>``.
+
+    Before rendering, call calculate_widths which populates the maximum column
+    width for each column.
+    Renders each cell in a the row with a minimum width defined by widths.
+    """
+
+    def __init__(self, **kw):
+        super(TableRow,self).__init__(rendered_contents_={}, **kw)
+
+    def calculate_widths(self, widths, **kw):
+        for i,node in enumerate(walk_tree(self,CellNode)):
+            self.rendered_contents_[i] = node.render(**kw)
+            width = len(self.rendered_contents_[i]['text'])
+            widths[i] = max(widths[i], width) if i in widths else width
+
+    def render(self, rowidx, widths, linetype, **kw):
+        text = ''
+        for i,node in self.rendered_contents_.iteritems():
+            if i == 0:
+                text += '|'
+
+            if node['align'] == 'right':
+                text += ' ' + node['text'].rjust(widths[i]) + ' |'
+            elif node['align'] == 'center':
+                text += ' ' + node['text'].center(widths[i]) + ' |'
+            else:
+                text += ' ' + node['text'].ljust(widths[i]) + ' |'
+
+        line = linetype * len(text)
+        if rowidx == 0:
+            return [line, '\n', text, '\n', line, '\n']
+        else:
+            return [text, '\n', line, '\n']
+
+class CellNode(Node):
+
+    """
+    Base type for all types of table cell
+    """
+
+    def render(self, **kw):
+        text = self.render_inner(**kw)
+        align = self.align if hasattr(self, 'align') else 'default'
+        return {'text': text, 'align': align}
+
+@html_element('th')
+class TableHeading(InlineNode,SequenceNode,CellNode):
+
+    """
+    Node to represent a heading cell (<th>). Flattens all internal elements into
+    a single line
+    """
+
+    @staticmethod
+    def parse(html_node):
+        return TableHeading(align=html_node.get('align', 'center'),
+                            contents=simplify_children(html_node))
+
+    def render_inner(self, **kw):
+        return ('_'
+                + "".join(join_smart(self.contents, indent=0, nowrap=1))
+                + '_')
+
+@html_element('td')
+class TableCell(InlineNode,SequenceNode,CellNode):
+
+    """
+    Node to represent a simple cell (<td>). Flattens all internal elements into
+    a single line
+    """
+
+    @staticmethod
+    def parse(html_node):
+        return TableCell(align=html_node.get('align', 'left'),
+                         contents=simplify_children(html_node))
+
+    def render_inner(self, **kw):
+        return "".join(join_smart(self.contents, indent=0, nowrap=1))
 
 class Reference(BlockLevelNode):
 
@@ -1194,10 +1331,13 @@ def join_inline(nodes, **kw):
     # Render the inline nodes.
     logger.debug("Inline nodes: %s", nodes)
     rendered_nodes = [n.render(**kw) for n in nodes]
-    return "\n".join(textwrap.wrap(compact("".join(rendered_nodes)),
-                                   initial_indent=prefix,
-                                   subsequent_indent=prefix,
-                                   width=TEXT_WIDTH - len(prefix)))
+    if 'nowrap' in kw and kw['nowrap']:
+        return compact("".join(rendered_nodes))
+    else:
+        return "\n".join(textwrap.wrap(compact("".join(rendered_nodes)),
+                                       initial_indent=prefix,
+                                       subsequent_indent=prefix,
+                                       width=TEXT_WIDTH - len(prefix)))
 
 def compact(text):
     """
