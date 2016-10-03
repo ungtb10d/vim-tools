@@ -721,18 +721,23 @@ class Heading(BlockLevelNode, SequenceNode):
         return Heading(level=int(html_node.name[1]),
                        contents=simplify_children(html_node))
 
+    def should_look_for_code(self):
+        nodes = walk_tree(self, Text)
+        return nodes[0].text == 'The '
+
     def tag_heading(self, existing_tags, prefix):
-        # Look for a <code> element (indicating a source code
-        # entity) whose text has not yet been used as a tag.
-        matches = walk_tree(self, CodeFragment)
-        logger.debug("Found %i code fragments inside heading: %s", len(matches), matches)
-        for node in matches:
-            tag = create_tag(node.text, prefix=prefix, is_code=True)
-            logger.debug("Checking if %r (from %r) can be used as a tag ..", tag, node.text)
-            if tag not in existing_tags:
-                # Found a usable tag.
-                self.tag = tag
-                return tag
+        if self.should_look_for_code():
+            # Look for a <code> element (indicating a source code
+            # entity) whose text has not yet been used as a tag.
+            matches = walk_tree(self, CodeFragment)
+            logger.debug("Found %i code fragments inside heading: %s", len(matches), matches)
+            for node in matches:
+                tag = create_tag(node.text, prefix=prefix, is_code=True)
+                logger.debug("Checking if %r (from %r) can be used as a tag ..", tag, node.text)
+                if tag not in existing_tags:
+                    # Found a usable tag.
+                    self.tag = tag
+                    return tag
         # Fall back to a tag generated from the heading's text.
         text = join_inline(self.contents, indent=0)
         tag = create_tag(text, prefix=prefix, is_code=False)
