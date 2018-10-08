@@ -108,7 +108,7 @@ def parse_args(argv):
     Parse the command line arguments given to html2vimdoc.
     """
     preview = False
-    markdown_extensions = ['fenced_code']
+    markdown_extensions = ['pymdownx.superfences']
     filename = ''
     title = ''
     url = ''
