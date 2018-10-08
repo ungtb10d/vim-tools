@@ -791,7 +791,21 @@ class Paragraph(BlockLevelNode, SequenceNode):
         # element) the paragraph is indented by a minimum of two spaces.
         if len(self.contents) == 1 and len(walk_tree(self, Image)) == 1:
             kw['indent'] = max(2, kw['indent'])
-        return [self.start_delimiter, join_inline(self.contents, **kw), self.end_delimiter]
+        # Support code block inside paragraph.
+        rendered_node = [self.start_delimiter]
+        nodes = []
+        for node in self.contents:
+            if isinstance(node, PreformattedText):
+                rendered_node.append(join_inline(nodes, **kw))
+                nodes = []
+                rendered_node.extend(node.render(**kw))
+                continue
+            nodes.append(node)
+        if nodes:
+            rendered_node.append(join_inline(nodes, **kw))
+        if not isinstance(rendered_node[-1], OutputDelimiter):
+            rendered_node.append(self.end_delimiter)
+        return rendered_node
 
 @html_element('pre')
 class PreformattedText(BlockLevelNode):
