@@ -43,7 +43,7 @@ install them is in a [Python virtual environment] [virtualenv]:
     virtualenv html2vimdoc
 
     # Install the dependencies.
-    html2vimdoc/bin/pip install beautifulsoup coloredlogs markdown
+    html2vimdoc/bin/pip install -r requirements.txt
 
     # Run the program.
     html2vimdoc/bin/python ./html2vimdoc.py --help
