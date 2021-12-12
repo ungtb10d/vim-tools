@@ -821,7 +821,9 @@ class Paragraph(BlockLevelNode, SequenceNode):
         rendered_node = [self.start_delimiter]
         nodes = []
         for node in self.contents:
-            if isinstance(node, PreformattedText):
+            if isinstance(node,
+                          BlockLevelSequence) or isinstance(node,
+                                                            PreformattedText):
                 rendered_node.append(join_inline(nodes, **kw))
                 nodes = []
                 rendered_node.extend(node.render(**kw))
