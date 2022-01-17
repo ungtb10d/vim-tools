@@ -38,8 +38,8 @@ import coloredlogs
 
 # Initialize the logging subsystem.
 logger = logging.getLogger('vimdoctool')
+coloredlogs.install(level='DEBUG')
 logger.setLevel(logging.INFO)
-logger.addHandler(coloredlogs.ColoredStreamHandler(show_name=True))
 
 # Compiled regular expressions used by parse_vim_script().
 function_pattern = re.compile(r'^function! ([^(]+)\(')
@@ -50,7 +50,7 @@ def main():
     Command line interface for vim-doc-tool.
     """
     markdown_document = os.path.abspath(sys.argv[1])
-    directory = os.path.dirname(markdown_document)
+    directory = os.path.dirname(markdown_document) if len( sys.argv ) == 2 else sys.argv[ 2 ]
     embed_documentation(directory, markdown_document, startlevel=1)
     logger.info("Done!")
 
@@ -68,7 +68,7 @@ def embed_documentation(directory, filename, startlevel=1, vfs=None):
         template = handle.read()
     if doc_start not in template:
         # Nothing to do.
-        logger.warn("Markdown document %s doesn't contain start marker: %s", filename, doc_start)
+        logger.warning("Markdown document %s doesn't contain start marker: %s", filename, doc_start)
         return False
     # Extract documentation from Vim scripts.
     documentation = generate_documentation(directory, startlevel=startlevel, vfs=vfs)
