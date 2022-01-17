@@ -54,7 +54,7 @@ The easiest way to install them is in a Python virtual environment:
 """
 
 # Standard library modules.
-import collections
+import collections.abc
 import getopt
 import logging
 import os
@@ -1453,7 +1453,7 @@ def flatten(l):
     From http://stackoverflow.com/a/2158532/788200.
     """
     for el in l:
-        if isinstance(el, collections.Iterable) and not isinstance(el, (str, unicode)):
+        if isinstance(el, collections.abc.Iterable) and not isinstance(el, (str, unicode)):
             for sub in flatten(el):
                 yield sub
         else:
